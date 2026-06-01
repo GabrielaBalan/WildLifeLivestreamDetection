@@ -172,7 +172,7 @@ def generate_text_summary(detections, frames, events, visits):
     top_species = detections["species"].value_counts()
     event_counts = events["event_type"].value_counts()
 
-    with open("analysis_summary.txt", "w", encoding="utf-8") as f:
+    with open("docs/analysis_summary.txt", "w", encoding="utf-8") as f:
         f.write("Wildlife Livestream Analysis Summary\n")
         f.write("=" * 45 + "\n\n")
 

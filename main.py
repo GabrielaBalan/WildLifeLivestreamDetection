@@ -4,14 +4,14 @@ from collections import Counter
 from ultralytics import YOLO
 
 from config import *
-from stream_utils import get_stream_url, timestamp_now_str, timestamp_now_dt, get_roi, init_folders, save_frame
-from detection_utils import process_box
-from csv_utils import (
+from utils.stream_utils import get_stream_url, timestamp_now_str, timestamp_now_dt, get_roi, init_folders, save_frame
+from utils.detection_utils import process_box
+from utils.csv_utils import (
     init_csv_files, log_detection, log_frame_summary, log_event,
     log_visit, save_zone_usage, save_co_occurrence
 )
 from tracking import VisitTracker
-from analytics_utils import draw_counts, save_session_summary
+from utils.analytics_utils import draw_counts, save_session_summary
 
 
 def main():
