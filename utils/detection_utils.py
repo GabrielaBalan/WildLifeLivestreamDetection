@@ -1,10 +1,12 @@
-from config import CLASS_MAPPING
+from config import CLASS_MAPPING, ANTELOPE_MIN_ASPECT_RATIO, LARGE_UNGULATE_MIN_AREA
 
 
-def get_zone(cx: float, frame_width: int) -> str:
-    if cx < frame_width / 3:
+def get_zone(cx: float, x_start: float, x_end: float) -> str:
+    """Splits the horizontal span [x_start, x_end) into left/center/right thirds."""
+    third = (x_end - x_start) / 3
+    if cx < x_start + third:
         return "left"
-    elif cx < 2 * frame_width / 3:
+    elif cx < x_start + 2 * third:
         return "center"
     return "right"
 
@@ -17,26 +19,29 @@ def refine_ungulate_label(x1: int, y1: int, x2: int, y2: int, frame_width: int, 
     aspect_ratio = height / max(width, 1)
     relative_area = area / max(frame_width * frame_height, 1)
 
-    if aspect_ratio >= 1.15:
+    if aspect_ratio >= ANTELOPE_MIN_ASPECT_RATIO:
         return "antelope_like"
 
-    if relative_area >= 0.025:
+    if relative_area >= LARGE_UNGULATE_MIN_AREA:
         return "large_ungulate"
 
     return "ungulate"
 
 
-def process_box(box, model, conf_threshold, roi_x1, roi_y1, frame_width, frame_height):
+def process_box(box, class_names, conf_threshold, roi_bounds, frame_width, frame_height):
+    """
+    Converts one YOLO box (in ROI pixel coordinates) to a full-frame detection dict.
+    Returns None for low-confidence or unmapped classes.
+    """
     conf = float(box.conf[0])
     if conf < conf_threshold:
         return None
 
-    cls_id = int(box.cls[0])
-    raw_class = model.names[cls_id]
-
+    raw_class = class_names[int(box.cls[0])]
     if raw_class not in CLASS_MAPPING:
         return None
 
+    roi_x1, roi_y1, roi_x2, _ = roi_bounds
     rx1, ry1, rx2, ry2 = map(int, box.xyxy[0])
 
     x1 = roi_x1 + rx1
@@ -48,16 +53,16 @@ def process_box(box, model, conf_threshold, roi_x1, roi_y1, frame_width, frame_h
     if species == "ungulate":
         species = refine_ungulate_label(x1, y1, x2, y2, frame_width, frame_height)
 
-    cx = (x1 + x2) / 2
-    zone = get_zone(cx, frame_width)
+    track_id = int(box.id[0]) if box.id is not None else None
 
     return {
         "species": species,
         "raw_class": raw_class,
         "conf": conf,
+        "track_id": track_id,
         "x1": x1,
         "y1": y1,
         "x2": x2,
         "y2": y2,
-        "zone": zone,
+        "zone": get_zone((x1 + x2) / 2, roi_x1, roi_x2),
     }

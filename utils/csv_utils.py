@@ -1,117 +1,101 @@
 import os
 import csv
-import uuid
+import json
 from config import (
+    OUTPUT_DIR,
     DETECTIONS_CSV,
     FRAME_SUMMARY_CSV,
     EVENTS_CSV,
     VISITS_CSV,
-    ZONE_USAGE_CSV,
-    CO_OCCURRENCE_CSV,
+    CSV_FLUSH_EVERY_ROWS,
 )
+from utils.stream_utils import format_timestamp
 
-def init_csv_files():
-    if not os.path.exists(DETECTIONS_CSV):
-        with open(DETECTIONS_CSV, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                "detection_id", "timestamp", "species", "raw_class", "confidence",
-                "x1", "y1", "x2", "y2", "cx", "cy", "width", "height", "zone"
-            ])
-
-    if not os.path.exists(FRAME_SUMMARY_CSV):
-        with open(FRAME_SUMMARY_CSV, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                "frame_id", "timestamp", "total_animals", "species_present", "counts"
-            ])
-
-    if not os.path.exists(EVENTS_CSV):
-        with open(EVENTS_CSV, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                "event_id", "timestamp", "event_type", "details", "image_path"
-            ])
-
-    if not os.path.exists(VISITS_CSV):
-        with open(VISITS_CSV, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                "visit_id", "species", "visit_start", "visit_end", "duration_seconds", "max_count_seen"
-            ])
-
-    if not os.path.exists(ZONE_USAGE_CSV):
-        with open(ZONE_USAGE_CSV, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["species", "zone", "count"])
-
-    if not os.path.exists(CO_OCCURRENCE_CSV):
-        with open(CO_OCCURRENCE_CSV, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["species_a", "species_b", "count"])
+DETECTION_COLUMNS = [
+    "session_id", "frame_id", "timestamp", "track_id", "species", "raw_class", "confidence",
+    "x1", "y1", "x2", "y2", "cx", "cy", "width", "height", "zone"
+]
+FRAME_SUMMARY_COLUMNS = ["session_id", "frame_id", "timestamp", "total_animals", "species_present", "counts"]
+EVENT_COLUMNS = ["session_id", "frame_id", "timestamp", "event_type", "details", "image_path"]
+VISIT_COLUMNS = [
+    "session_id", "species", "visit_start", "visit_end", "duration_seconds", "max_count_seen", "individuals_seen"
+]
 
 
-def log_detection(file_path, timestamp, species, raw_class, conf, x1, y1, x2, y2, zone):
-    detection_id = str(uuid.uuid4())
-    width = x2 - x1
-    height = y2 - y1
-    cx = (x1 + x2) / 2
-    cy = (y1 + y2) / 2
+class CsvLog:
+    """Append-only CSV file kept open for the whole session and flushed every N rows."""
 
-    with open(file_path, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow([
-            detection_id, timestamp, species, raw_class, round(conf, 4),
-            x1, y1, x2, y2, round(cx, 2), round(cy, 2), width, height, zone
+    def __init__(self, path, columns, flush_every=CSV_FLUSH_EVERY_ROWS):
+        self.flush_every = flush_every
+        self._pending = 0
+
+        is_new = not os.path.exists(path) or os.path.getsize(path) == 0
+        if not is_new:
+            with open(path, newline="", encoding="utf-8") as f:
+                existing = next(csv.reader(f), [])
+            if existing != columns:
+                raise RuntimeError(
+                    f"{path} has columns {existing}, expected {columns}. "
+                    "Move the old file aside before starting a new session."
+                )
+
+        self._file = open(path, "a", newline="", encoding="utf-8")
+        self._writer = csv.writer(self._file)
+        if is_new:
+            self._writer.writerow(columns)
+
+    def write(self, row):
+        self._writer.writerow(row)
+        self._pending += 1
+        if self._pending >= self.flush_every:
+            self.flush()
+
+    def flush(self):
+        self._file.flush()
+        self._pending = 0
+
+    def close(self):
+        self._file.close()
+
+
+class SessionLogs:
+    def __init__(self, session_id, output_dir=OUTPUT_DIR):
+        os.makedirs(output_dir, exist_ok=True)
+        self.session_id = session_id
+        self.detections = CsvLog(os.path.join(output_dir, DETECTIONS_CSV), DETECTION_COLUMNS)
+        self.frames = CsvLog(os.path.join(output_dir, FRAME_SUMMARY_CSV), FRAME_SUMMARY_COLUMNS)
+        self.events = CsvLog(os.path.join(output_dir, EVENTS_CSV), EVENT_COLUMNS, flush_every=1)
+        self.visits = CsvLog(os.path.join(output_dir, VISITS_CSV), VISIT_COLUMNS, flush_every=1)
+
+    def log_detection(self, frame_id, timestamp, detection):
+        x1, y1, x2, y2 = detection["x1"], detection["y1"], detection["x2"], detection["y2"]
+        self.detections.write([
+            self.session_id, frame_id, timestamp, detection["track_id"], detection["species"],
+            detection["raw_class"], round(detection["conf"], 4),
+            x1, y1, x2, y2, round((x1 + x2) / 2, 2), round((y1 + y2) / 2, 2), x2 - x1, y2 - y1,
+            detection["zone"]
         ])
 
-
-def log_frame_summary(file_path, timestamp, counts):
-    frame_id = str(uuid.uuid4())
-    total = sum(counts.values())
-    species_present = sorted(counts.keys())
-
-    with open(file_path, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow([
-            frame_id, timestamp, total, str(species_present), str(dict(sorted(counts.items())))
+    def log_frame_summary(self, frame_id, timestamp, counts):
+        self.frames.write([
+            self.session_id, frame_id, timestamp, sum(counts.values()),
+            json.dumps(sorted(counts)), json.dumps(dict(sorted(counts.items())))
         ])
 
+    def log_event(self, frame_id, timestamp, event_type, details, image_path=""):
+        self.events.write([self.session_id, frame_id, timestamp, event_type, details, image_path])
 
-def log_event(file_path, timestamp, event_type, details, image_path=""):
-    event_id = str(uuid.uuid4())
-
-    with open(file_path, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow([event_id, timestamp, event_type, details, image_path])
-
-
-def log_visit(file_path, species, visit_start, visit_end, duration_seconds, max_count_seen):
-    visit_id = str(uuid.uuid4())
-
-    with open(file_path, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow([
-            visit_id,
-            species,
-            visit_start.strftime("%Y-%m-%d %H:%M:%S"),
-            visit_end.strftime("%Y-%m-%d %H:%M:%S"),
-            round(duration_seconds, 2),
-            max_count_seen
+    def log_visit(self, visit):
+        self.visits.write([
+            self.session_id,
+            visit.species,
+            format_timestamp(visit.start_time),
+            format_timestamp(visit.end_time),
+            round(visit.duration_seconds, 2),
+            visit.max_count_seen,
+            visit.individuals_seen
         ])
 
-
-def save_zone_usage(file_path, zone_usage_counter):
-    with open(file_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["species", "zone", "count"])
-        for (species, zone), count in sorted(zone_usage_counter.items()):
-            writer.writerow([species, zone, count])
-
-
-def save_co_occurrence(file_path, co_occurrence_counter):
-    with open(file_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["species_a", "species_b", "count"])
-        for (species_a, species_b), count in sorted(co_occurrence_counter.items()):
-            writer.writerow([species_a, species_b, count])
+    def close(self):
+        for log in (self.detections, self.frames, self.events, self.visits):
+            log.close()

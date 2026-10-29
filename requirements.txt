@@ -1,0 +1,9 @@
+ultralytics>=8.4
+opencv-python>=4.10
+lap>=0.5.12
+yt-dlp
+pandas>=2.2
+matplotlib>=3.8
+streamlit>=1.46
+plotly>=6
+pytest>=8

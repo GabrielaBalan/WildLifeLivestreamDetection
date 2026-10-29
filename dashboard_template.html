@@ -1,0 +1,817 @@
+<title>Savanna Cam Log</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  /* Layout: field-log masthead -> recording-day strip (doubles as the day filter) -> species chips -> figures -> two-column chart grid */
+  --page: #f1f2ec;
+  --surface: #fcfcfb;
+  --surface-2: #efefe9;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --base: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --sel: #e1ebf8;
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --wash: rgba(42, 120, 214, 0.12);
+  --on-fill: #ffffff;
+  --h1: #cde2fb; --h2: #9ec5f4; --h3: #6da7ec; --h4: #3987e5; --h5: #256abf; --h6: #184f95; --h7: #0d366b;
+  --zero: #e6e5de;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #10110e; --surface: #1a1a19; --surface-2: #242422;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --base: #383835; --border: rgba(255, 255, 255, 0.10); --sel: #1c2a3c;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --wash: rgba(57, 135, 229, 0.18);
+    --h1: #104281; --h2: #184f95; --h3: #256abf; --h4: #2a78d6; --h5: #5598e7; --h6: #86b6ef; --h7: #cde2fb;
+    --zero: #2a2a28;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #10110e; --surface: #1a1a19; --surface-2: #242422;
+  --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --base: #383835; --border: rgba(255, 255, 255, 0.10); --sel: #1c2a3c;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --wash: rgba(57, 135, 229, 0.18);
+  --h1: #104281; --h2: #184f95; --h3: #256abf; --h4: #2a78d6; --h5: #5598e7; --h6: #86b6ef; --h7: #cde2fb;
+  --zero: #2a2a28;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap {
+  max-width: 1240px; margin: 0 auto;
+  padding-block: 32px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 20px;
+}
+h1, h2, h3, p { margin: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+.mono { font-family: var(--mono); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Masthead */
+.masthead { display: flex; flex-direction: column; gap: 8px; padding-bottom: 4px; }
+.eyebrow { font: 500 12px/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+h1 { font: 700 clamp(2.4rem, 6vw, 3.75rem)/0.95 var(--display); letter-spacing: 0.01em; text-transform: uppercase; text-wrap: balance; }
+.lede { font-size: 17px; color: var(--ink-2); max-width: 62ch; }
+
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.panel-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 16px 18px 8px; }
+h2 { font: 600 20px/1.2 var(--display); letter-spacing: 0.02em; text-transform: uppercase; }
+.hint { font-size: 14px; color: var(--ink-2); max-width: 70ch; }
+
+/* Recording-day strip */
+.strip { display: flex; flex-direction: column; padding: 4px 10px 12px; }
+.strip-row {
+  display: grid; grid-template-columns: 8.5rem 1fr 4.5rem; align-items: center; gap: 14px;
+  width: 100%; padding: 6px 8px; border: 0; border-radius: 4px; background: transparent; text-align: left; cursor: pointer;
+}
+.strip-row:hover { background: var(--surface-2); }
+.strip-row[aria-pressed="true"] { background: var(--sel); }
+.strip-row[aria-pressed="true"] .day-label { font-weight: 600; }
+.strip-axis { cursor: default; padding-block: 0 2px; }
+.strip-axis:hover { background: transparent; }
+.day-label { font-size: 14px; white-space: nowrap; }
+.day-mins { font: 12px/1 var(--mono); color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+.track {
+  position: relative; height: 20px; border-radius: 3px; background-color: var(--surface-2);
+  background-image: linear-gradient(to right, var(--grid) 1px, transparent 1px);
+  background-size: 25% 100%;
+}
+.track-axis { height: 16px; background: none; }
+.tick-label { position: absolute; top: 0; transform: translateX(-50%); font: 11px/16px var(--mono); color: var(--muted); }
+.tick-label:first-child { transform: none; }
+.tick-label:last-child { transform: translateX(-100%); }
+.block { position: absolute; top: 3px; bottom: 3px; min-width: 3px; border-radius: 2px; }
+.all-row .block { opacity: 0.55; }
+
+/* Species chips */
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.filters-label { font: 500 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); margin-right: 4px; }
+.chip {
+  display: inline-flex; align-items: baseline; gap: 8px; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--base); background: var(--surface); cursor: pointer; font-size: 14px;
+}
+.chip:hover { border-color: var(--ink-2); }
+.chip .count { font: 12px/1 var(--mono); color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.chip[aria-pressed="true"] .count { color: var(--surface); opacity: 0.7; }
+
+/* Figures */
+.tiles {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px;
+  background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+}
+.tile { background: var(--surface); padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; }
+.tile-label { font-size: 14px; color: var(--ink-2); }
+.tile-value { font: 600 34px/1.05 var(--display); }
+.tile-sub { font-size: 13px; color: var(--ink-2); }
+.tile.hero { grid-column: span 2; }
+.tile.hero .tile-value { font-size: clamp(52px, 8vw, 72px); font-weight: 700; }
+
+/* Chart grid */
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card.wide { grid-column: 1 / -1; }
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.card-head > div { display: flex; flex-direction: column; gap: 4px; }
+h3 { font: 600 22px/1.15 var(--display); letter-spacing: 0.01em; }
+.card-sub { font-size: 14px; color: var(--ink-2); max-width: 65ch; }
+.view-toggle {
+  flex: none; padding: 5px 10px; border: 1px solid var(--base); border-radius: 4px; background: transparent; cursor: pointer;
+  font: 500 11px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2);
+}
+.view-toggle:hover { border-color: var(--ink-2); color: var(--ink); }
+.card-body { min-width: 0; }
+.empty { color: var(--ink-2); font-size: 14px; padding: 24px 0; }
+.note { font-size: 13px; color: var(--ink-2); margin-top: 10px; max-width: 70ch; }
+
+svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font-family: var(--body); }
+.chart .tick { fill: var(--muted); font: 11px var(--mono); font-variant-numeric: tabular-nums; }
+.chart .label { fill: var(--ink-2); font-size: 13px; }
+.chart .value { fill: var(--ink); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart .inlabel { fill: var(--on-fill); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; pointer-events: none; }
+.chart .grid { stroke: var(--grid); stroke-width: 1; }
+.chart .axis, .chart .sep { stroke: var(--base); stroke-width: 1; }
+.chart .line { fill: none; stroke: var(--s1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .area { fill: var(--wash); }
+.chart .dot { fill: var(--s1); stroke: var(--surface); stroke-width: 2; }
+.chart .crosshair { stroke: var(--ink-2); stroke-width: 1; }
+.chart .bar { fill: var(--s1); }
+.chart .hit { fill: transparent; }
+.chart .bar-row.muted .bar { opacity: 0.3; }
+.chart .bar-row:hover .bar, .chart .bar-row:focus .bar { opacity: 0.8; }
+.chart .bar-row.pickable { cursor: pointer; }
+.chart .bar-row:focus { outline: none; }
+.chart .bar-row:focus-visible .hit { stroke: var(--s1); stroke-width: 2; }
+.chart .cell-none { fill: transparent; stroke: var(--grid); stroke-width: 1; }
+.chart .cell-zero { fill: var(--zero); }
+
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13px; color: var(--ink-2); margin-bottom: 10px; }
+.legend.below { margin: 12px 0 0; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.swatch.none { background: transparent; border: 1px solid var(--grid); }
+.ramp { display: inline-flex; gap: 2px; }
+.ramp .swatch { width: 14px; }
+
+/* Tables */
+.table-wrap { overflow: auto; max-height: 380px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th {
+  position: sticky; top: 0; background: var(--surface); text-align: left; padding: 6px 10px 6px 0;
+  font: 500 11px/1.3 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+  border-bottom: 1px solid var(--base);
+}
+td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.inline-bar { height: 8px; border-radius: 0 2px 2px 0; background: var(--s1); min-width: 2px; }
+.bar-cell { width: 35%; }
+
+.tooltip {
+  position: fixed; z-index: 20; pointer-events: none; max-width: 280px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14); padding: 8px 10px; font-size: 13px;
+}
+.tip-title { color: var(--ink-2); margin-bottom: 2px; }
+.tip-row { display: flex; align-items: center; gap: 6px; }
+.tip-row strong { font-weight: 600; font-variant-numeric: tabular-nums; }
+.tip-row span:last-child { color: var(--ink-2); }
+.tip-key { width: 12px; height: 2px; border-radius: 1px; flex: none; }
+
+@media (max-width: 860px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .strip-row { grid-template-columns: 5.6rem 1fr 3.2rem; gap: 8px; }
+  .day-label { font-size: 13px; }
+  .tile.hero { grid-column: 1 / -1; }
+}
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow" id="eyebrow">Wildlife livestream · YOLO detection + ByteTrack</p>
+    <h1>Savanna Cam Log</h1>
+    <p class="lede" id="lede"></p>
+  </header>
+
+  <section class="panel" aria-labelledby="strip-title">
+    <div class="panel-head">
+      <h2 id="strip-title">Recording days</h2>
+      <p class="hint">Pick a day to filter everything below. Each block is one recording session on a 24-hour clock, shaded darker when animals were in view more often.</p>
+    </div>
+    <div class="strip" id="strip"></div>
+  </section>
+
+  <div class="filters" id="species-filter" role="group" aria-label="Filter by species"></div>
+
+  <section class="tiles" id="tiles" aria-label="Key figures"></section>
+
+  <section class="grid" id="grid"></section>
+</div>
+
+<div class="tooltip" id="tooltip" role="status" hidden></div>
+
+<script>
+const DATA = __DASHBOARD_DATA__;
+
+const SVGNS = "http://www.w3.org/2000/svg";
+const ZONES = [["left", "Left", "var(--s1)"], ["center", "Centre", "var(--s2)"], ["right", "Right", "var(--s3)"]];
+const EVENT_TYPES = [
+  ["activity_started", "Activity started"],
+  ["activity_ended", "Scene emptied"],
+  ["new_species_detected", "New species"],
+  ["multi_species_detected", "Mixed species"],
+  ["large_group_detected", "Large group"],
+];
+const VISIT_BINS = [
+  [0, 5, "<5s", "under 5 s"], [5, 15, "5–15s", "5–15 s"], [15, 30, "15–30s", "15–30 s"], [30, 60, "30–60s", "30–60 s"],
+  [60, 120, "1–2m", "1–2 min"], [120, 300, "2–5m", "2–5 min"], [300, Infinity, ">5m", "over 5 min"],
+];
+
+const state = { day: null, species: null, views: {} };
+
+// ---------- helpers ----------
+const dayOf = s => s.slice(0, 10);
+const hourOf = s => +s.slice(11, 13);
+const secondsOfDay = s => +s.slice(11, 13) * 3600 + +s.slice(14, 16) * 60 + +s.slice(17, 19);
+const sum = (arr, f) => arr.reduce((a, d) => a + f(d), 0);
+const fmtInt = n => Math.round(n).toLocaleString("en-GB");
+const fmtCompact = n => n >= 1e4 ? Math.round(n / 1e3) + "K" : n >= 1e3 ? (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K" : fmtInt(n);
+const fmtPct = (a, b) => b ? (a / b * 100).toFixed(1) + "%" : "–";
+const fmtDay = d => new Date(d + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+const fmtTime = s => s.slice(11, 16);
+const fmtDuration = sec => sec < 60 ? Math.round(sec) + " s" : sec < 3600 ? Math.round(sec / 60) + " min" : (sec / 3600).toFixed(1) + " h";
+const speciesLabel = s => { const t = s.replace(/_like$/, "-like").replace(/_/g, " "); return t.charAt(0).toUpperCase() + t.slice(1); };
+const median = xs => { if (!xs.length) return 0; const a = [...xs].sort((p, q) => p - q), m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+
+function niceStep(max, count = 4) {
+  const raw = max / count, mag = 10 ** Math.floor(Math.log10(raw)), norm = raw / mag;
+  return (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+}
+const fmtTick = v => v >= 1000 ? fmtCompact(v) : +v.toFixed(2) + "";
+
+function h(tag, props = {}, children = []) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k === "text") e.textContent = v;
+    else if (k === "class") e.className = v;
+    else if (k === "style") Object.assign(e.style, v);
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of [].concat(children)) if (c != null) e.append(c);
+  return e;
+}
+function s(tag, attrs = {}, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "text") e.textContent = v;
+    else if (k === "style") Object.assign(e.style, v);
+    else e.setAttribute(k, v);
+  }
+  if (parent) parent.append(e);
+  return e;
+}
+function svgRoot(W, H, label) {
+  return s("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: "chart", role: "img", "aria-label": label });
+}
+// Bars: 4px rounded data-end, square at the baseline
+function hbarPath(x, y, w, hgt, r = 4) {
+  r = Math.min(r, w / 2, hgt / 2);
+  return `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + hgt - r}Q${x + w},${y + hgt} ${x + w - r},${y + hgt}H${x}Z`;
+}
+function colPath(x, yTop, w, yBase, r = 4) {
+  r = Math.min(r, w / 2, (yBase - yTop) / 2);
+  return `M${x},${yBase}V${yTop + r}Q${x},${yTop} ${x + r},${yTop}H${x + w - r}Q${x + w},${yTop} ${x + w},${yTop + r}V${yBase}Z`;
+}
+
+// ---------- tooltip ----------
+const tip = document.getElementById("tooltip");
+function showTip(cx, cy, title, rows) {
+  tip.replaceChildren(
+    h("p", { class: "tip-title", text: title }),
+    ...rows.map(r => h("p", { class: "tip-row" }, [
+      r.key ? h("span", { class: "tip-key", style: { background: r.key } }) : null,
+      h("strong", { text: r.value }),
+      h("span", { text: r.label }),
+    ])),
+  );
+  tip.hidden = false;
+  const pad = 14, tw = tip.offsetWidth, th = tip.offsetHeight;
+  let left = cx + pad, top = cy + pad;
+  if (left + tw > innerWidth - 8) left = cx - pad - tw;
+  if (top + th > innerHeight - 8) top = cy - pad - th;
+  tip.style.left = Math.max(8, left) + "px";
+  tip.style.top = Math.max(8, top) + "px";
+}
+function hideTip() { tip.hidden = true; }
+function attachTip(el, title, rows) {
+  el.addEventListener("pointermove", e => showTip(e.clientX, e.clientY, title, rows));
+  el.addEventListener("pointerleave", hideTip);
+  el.addEventListener("focus", () => { const r = el.getBoundingClientRect(); showTip(r.right - 20, r.top, title, rows); });
+  el.addEventListener("blur", hideTip);
+}
+
+// ---------- data ----------
+const DAYS = [...new Set(DATA.minutes.map(d => dayOf(d.minute)))].sort();
+const SPECIES = (() => {
+  const totals = new Map();
+  for (const d of DATA.species_minutes) totals.set(d.species, (totals.get(d.species) || 0) + d.detections);
+  return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([sp]) => sp);
+})();
+
+function selection() {
+  const dayOk = t => !state.day || dayOf(t) === state.day;
+  const spOk = sp => !state.species || sp === state.species;
+  const speciesMinutesDay = DATA.species_minutes.filter(d => dayOk(d.minute));
+  return {
+    minutes: DATA.minutes.filter(d => dayOk(d.minute)),
+    speciesMinutesDay,
+    speciesMinutes: speciesMinutesDay.filter(d => spOk(d.species)),
+    events: DATA.events.filter(d => dayOk(d.minute)),
+    visits: DATA.visits.filter(d => dayOk(d.visit_start) && spOk(d.species)),
+    cooc: DATA.co_occurrence.filter(d => dayOk(d.minute) && (!state.species || d.species_a === state.species || d.species_b === state.species)),
+    sessions: DATA.sessions.filter(d => dayOk(d.start)),
+  };
+}
+
+function heatStep(fraction) { return 1 + Math.round(Math.max(0, Math.min(1, fraction)) * 6); }
+
+// ---------- strip (day filter) ----------
+function sessionBlock(sess) {
+  const start = secondsOfDay(sess.start);
+  const dur = Math.max(0, (new Date(sess.end) - new Date(sess.start)) / 1000);
+  const occ = sess.frames ? sess.occupied / sess.frames : 0;
+  const block = h("span", { class: "block", style: {
+    left: (start / 86400 * 100) + "%",
+    width: (Math.min(dur, 86400 - start) / 86400 * 100) + "%",
+    background: `var(--h${heatStep(occ)})`,
+  } });
+  block.addEventListener("pointermove", e => showTip(e.clientX, e.clientY, `${fmtDay(dayOf(sess.start))}, ${fmtTime(sess.start)}–${fmtTime(sess.end)}`, [
+    { value: fmtDuration(dur), label: "recorded" },
+    { value: fmtInt(sess.frames), label: "frames" },
+    { value: fmtPct(sess.occupied, sess.frames), label: "with animals in view" },
+  ]));
+  block.addEventListener("pointerleave", hideTip);
+  return block;
+}
+
+function renderStrip() {
+  const root = document.getElementById("strip");
+  const minutesByDay = new Map();
+  for (const d of DATA.minutes) minutesByDay.set(dayOf(d.minute), (minutesByDay.get(dayOf(d.minute)) || 0) + 1);
+
+  const axis = h("div", { class: "strip-row strip-axis", "aria-hidden": "true" }, [
+    h("span"),
+    h("div", { class: "track track-axis" }, [0, 6, 12, 18, 24].map(hr =>
+      h("span", { class: "tick-label", style: { left: hr / 24 * 100 + "%" }, text: String(hr).padStart(2, "0") + ":00" }))),
+    h("span"),
+  ]);
+
+  const row = (day, label, sessions, minutes, extraClass = "") => h("button", {
+    type: "button", class: "strip-row " + extraClass, id: `day-${day || "all"}`,
+    "aria-pressed": String(state.day === day),
+    onclick: () => { state.day = day; render(); },
+  }, [
+    h("span", { class: "day-label", text: label }),
+    h("span", { class: "track" }, sessions.map(sessionBlock)),
+    h("span", { class: "day-mins", text: `${fmtInt(minutes)} min` }),
+  ]);
+
+  root.replaceChildren(
+    axis,
+    row(null, "All days", DATA.sessions, DATA.minutes.length, "all-row"),
+    ...DAYS.map(day => row(day, fmtDay(day), DATA.sessions.filter(se => dayOf(se.start) === day), minutesByDay.get(day) || 0)),
+  );
+}
+
+// ---------- species chips ----------
+function renderSpeciesFilter(sel) {
+  const counts = new Map();
+  for (const d of sel.speciesMinutesDay) counts.set(d.species, (counts.get(d.species) || 0) + d.detections);
+  const chip = (sp, label, count) => h("button", {
+    type: "button", class: "chip", id: `species-${sp || "all"}`, "aria-pressed": String(state.species === sp),
+    onclick: () => { state.species = state.species === sp ? null : sp; render(); },
+  }, [h("span", { text: label }), count == null ? null : h("span", { class: "count", text: fmtCompact(count) })]);
+
+  document.getElementById("species-filter").replaceChildren(
+    h("span", { class: "filters-label", text: "Species" }),
+    chip(null, "All species"),
+    ...SPECIES.map(sp => chip(sp, speciesLabel(sp), counts.get(sp) || 0)),
+  );
+}
+
+// ---------- figures ----------
+function renderTiles(sel) {
+  const frames = sum(sel.minutes, d => d.frames);
+  const occupied = state.species ? sum(sel.speciesMinutes, d => d.frames_present) : sum(sel.minutes, d => d.occupied);
+  const detections = sum(sel.speciesMinutes, d => d.detections);
+  const confidence = detections ? sum(sel.speciesMinutes, d => d.confidence_sum) / detections : 0;
+  const sessions = new Set(sel.minutes.map(d => d.session)).size;
+  const events = sum(sel.events, d => d.count);
+  const eventTotals = EVENT_TYPES.map(([key, label]) => [label, sum(sel.events.filter(e => e.event_type === key), e => e.count)]).sort((a, b) => b[1] - a[1]);
+
+  const tile = (label, value, sub, hero = false) => h("div", { class: "tile" + (hero ? " hero" : "") }, [
+    h("p", { class: "tile-label", text: label }),
+    h("p", { class: "tile-value", text: value }),
+    h("p", { class: "tile-sub", text: sub }),
+  ]);
+
+  document.getElementById("tiles").replaceChildren(
+    tile(state.species ? `Frames with ${speciesLabel(state.species).toLowerCase()} in view` : "Scene occupancy",
+      fmtPct(occupied, frames), `${fmtInt(occupied)} of ${fmtInt(frames)} frames`, true),
+    tile("Recorded", `${fmtInt(sel.minutes.length)} min`, `${sessions} session${sessions === 1 ? "" : "s"}`),
+    tile("Detections", fmtCompact(detections), detections ? `average confidence ${confidence.toFixed(2)}` : "none in this selection"),
+    tile("Visits", fmtInt(sel.visits.length), sel.visits.length ? `median ${fmtDuration(median(sel.visits.map(v => v.duration_seconds)))}` : "none in this selection"),
+    tile("Scene events", fmtInt(events), events ? `most often: ${eventTotals[0][0].toLowerCase()}` : "none in this selection"),
+  );
+}
+
+// ---------- charts ----------
+function hbars({ items, width, fmt, highlight, onPick, label, tipLabel }) {
+  const rowH = 32, barH = 14, labelW = 124, valueW = 56;
+  const W = Math.max(width, 280), H = items.length * rowH + 4;
+  const x0 = labelW, x1 = W - valueW;
+  const maxV = Math.max(1, ...items.map(d => d.value));
+  const svg = svgRoot(W, H, label);
+  items.forEach((d, i) => {
+    const top = 2 + i * rowH, cy = top + rowH / 2;
+    const g = s("g", {
+      class: "bar-row" + (highlight && highlight !== d.key ? " muted" : "") + (onPick ? " pickable" : ""),
+      tabindex: 0, role: onPick ? "button" : "img", "aria-label": `${d.label}: ${fmt(d.value)}`,
+    }, svg);
+    s("rect", { class: "hit", x: 0, y: top, width: W, height: rowH, rx: 3 }, g);
+    s("text", { class: "label", x: x0 - 10, y: cy + 4, "text-anchor": "end", text: d.label }, g);
+    const w = d.value / maxV * (x1 - x0);
+    if (w > 0) s("path", { class: "bar", d: hbarPath(x0, cy - barH / 2, w, barH) }, g);
+    s("text", { class: "value", x: x0 + w + 6, y: cy + 4, text: fmt(d.value) }, g);
+    attachTip(g, d.label, [{ value: fmt(d.value), label: tipLabel, key: "var(--s1)" }, ...(d.extra || [])]);
+    if (onPick) {
+      g.addEventListener("click", () => onPick(d.key));
+      g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(d.key); } });
+    }
+  });
+  s("line", { class: "axis", x1: x0, x2: x0, y1: 0, y2: H }, svg);
+  return svg;
+}
+
+function buildTimeline(sel, width) {
+  const bySpecies = new Map();
+  if (state.species) for (const d of sel.speciesMinutes) bySpecies.set(d.minute, d.animals);
+  const pts = sel.minutes.map(d => ({
+    minute: d.minute, session: d.session, frames: d.frames,
+    value: (state.species ? (bySpecies.get(d.minute) || 0) : d.animals) / d.frames,
+  }));
+  const name = state.species ? speciesLabel(state.species).toLowerCase() : "animals";
+  const sub = `Average ${name} in view per frame, for each minute with footage. Gaps between sessions are closed up; ${state.day ? "labels mark session starts" : "hairlines mark a new day"}.`;
+  const table = {
+    columns: [{ label: "Day" }, { label: "Time" }, { label: "Frames", num: true }, { label: `${speciesLabel(name)} per frame`, num: true }],
+    rows: pts.map(p => [fmtDay(dayOf(p.minute)), fmtTime(p.minute), fmtInt(p.frames), p.value.toFixed(2)]),
+  };
+  if (!pts.length) return { sub, table, empty: "No footage in this selection." };
+
+  const W = Math.max(width, 280), H = 240, m = { t: 14, r: 12, b: 30, l: 40 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b, step = iw / pts.length;
+  const x = i => m.l + (i + 0.5) * step;
+  const maxV = Math.max(...pts.map(p => p.value));
+  const tStep = niceStep(maxV || 1, 4), yMax = Math.max(tStep, Math.ceil(maxV / tStep) * tStep);
+  const y = v => m.t + ih - v / yMax * ih;
+  const svg = svgRoot(W, H, `Line chart of average ${name} per frame over ${pts.length} recorded minutes`);
+
+  for (let v = 0; v <= yMax + 1e-9; v += tStep) {
+    s("line", { class: v === 0 ? "axis" : "grid", x1: m.l, x2: W - m.r, y1: y(v), y2: y(v) }, svg);
+    s("text", { class: "tick", x: m.l - 8, y: y(v) + 4, "text-anchor": "end", text: fmtTick(v) }, svg);
+  }
+
+  let lastLabelX = -Infinity;
+  pts.forEach((p, i) => {
+    const bx = m.l + i * step;
+    const newDay = i === 0 || dayOf(p.minute) !== dayOf(pts[i - 1].minute);
+    const newSession = i === 0 || p.session !== pts[i - 1].session;
+    if (!state.day && newDay && i > 0) s("line", { class: "sep", x1: bx, x2: bx, y1: m.t, y2: m.t + ih }, svg);
+    const text = state.day ? (newSession ? fmtTime(p.minute) : null) : (newDay ? fmtDay(dayOf(p.minute)) : null);
+    if (text && bx - lastLabelX >= 72 && bx <= W - m.r - 56) {
+      s("text", { class: "tick", x: bx + (i === 0 ? 0 : 4), y: H - 10, text }, svg);
+      lastLabelX = bx;
+    }
+  });
+
+  let seg = [];
+  const flush = () => {
+    if (seg.length === 1) {
+      s("circle", { class: "dot", cx: x(seg[0]), cy: y(pts[seg[0]].value), r: 4 }, svg);
+    } else if (seg.length > 1) {
+      const line = seg.map((i, k) => `${k ? "L" : "M"}${x(i).toFixed(1)},${y(pts[i].value).toFixed(1)}`).join("");
+      s("path", { class: "area", d: `${line}L${x(seg.at(-1)).toFixed(1)},${y(0)}L${x(seg[0]).toFixed(1)},${y(0)}Z` }, svg);
+      s("path", { class: "line", d: line }, svg);
+    }
+    seg = [];
+  };
+  pts.forEach((p, i) => { if (i > 0 && p.session !== pts[i - 1].session) flush(); seg.push(i); });
+  flush();
+
+  const cross = s("line", { class: "crosshair", y1: m.t, y2: m.t + ih, visibility: "hidden" }, svg);
+  const focusDot = s("circle", { class: "dot", r: 4, visibility: "hidden" }, svg);
+  const hit = s("rect", { class: "hit", x: m.l, y: m.t, width: iw, height: ih }, svg);
+  hit.addEventListener("pointermove", e => {
+    const r = svg.getBoundingClientRect();
+    const px = (e.clientX - r.left) * (W / r.width);
+    const i = Math.max(0, Math.min(pts.length - 1, Math.floor((px - m.l) / step)));
+    const p = pts[i];
+    for (const [k, v] of [["x1", x(i)], ["x2", x(i)], ["visibility", "visible"]]) cross.setAttribute(k, v);
+    for (const [k, v] of [["cx", x(i)], ["cy", y(p.value)], ["visibility", "visible"]]) focusDot.setAttribute(k, v);
+    showTip(e.clientX, e.clientY, `${fmtDay(dayOf(p.minute))}, ${fmtTime(p.minute)}`, [
+      { value: p.value.toFixed(2), label: `${name} per frame`, key: "var(--s1)" },
+      { value: fmtInt(p.frames), label: "frames" },
+    ]);
+  });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); focusDot.setAttribute("visibility", "hidden"); hideTip(); });
+
+  return { sub, table, node: svg };
+}
+
+function buildSpecies(sel, width) {
+  const stats = new Map();
+  for (const d of sel.speciesMinutesDay) {
+    const st = stats.get(d.species) || { detections: 0, conf: 0, frames: 0 };
+    st.detections += d.detections; st.conf += d.confidence_sum; st.frames += d.frames_present;
+    stats.set(d.species, st);
+  }
+  const items = SPECIES.filter(sp => stats.has(sp) && stats.get(sp).detections > 0).map(sp => {
+    const st = stats.get(sp);
+    return {
+      key: sp, label: speciesLabel(sp), value: st.detections,
+      extra: [{ value: (st.conf / st.detections).toFixed(2), label: "average confidence" }, { value: fmtInt(st.frames), label: "frames present" }],
+    };
+  });
+  const sub = "Boxes summed over all frames, so one animal seen for a minute counts many times. Select a bar to filter by that species.";
+  const table = {
+    columns: [{ label: "Species" }, { label: "Detections", num: true }, { label: "Avg confidence", num: true }, { label: "Frames present", num: true }],
+    rows: items.map(d => [d.label, fmtInt(d.value), d.extra[0].value, d.extra[1].value]),
+  };
+  if (!items.length) return { sub, table, empty: "No detections in this selection." };
+  const node = hbars({
+    items, width, fmt: fmtCompact, highlight: state.species, tipLabel: "detections",
+    onPick: sp => { state.species = state.species === sp ? null : sp; render(); },
+    label: "Bar chart of detections per species",
+  });
+  return { sub, table, node };
+}
+
+function buildHours(sel, width) {
+  const counts = new Map();
+  for (const d of sel.speciesMinutes) {
+    const k = `${d.species}|${hourOf(d.minute)}`;
+    counts.set(k, (counts.get(k) || 0) + d.detections);
+  }
+  const rows = SPECIES.filter(sp => (!state.species || sp === state.species) && [...Array(24).keys()].some(hr => counts.get(`${sp}|${hr}`)));
+  const recorded = new Set(sel.minutes.map(d => hourOf(d.minute)));
+  const sub = "Detections per hour of the day. Darker means more; outlined cells are hours with no footage.";
+  const table = {
+    columns: [{ label: "Species" }, { label: "Hour" }, { label: "Detections", num: true }],
+    rows: rows.flatMap(sp => [...Array(24).keys()].filter(hr => counts.get(`${sp}|${hr}`)).map(hr =>
+      [speciesLabel(sp), `${String(hr).padStart(2, "0")}:00`, fmtInt(counts.get(`${sp}|${hr}`))])),
+  };
+  if (!rows.length) return { sub, table, empty: "No detections in this selection." };
+
+  const labelW = 112, headerH = 22;
+  const cell = Math.max(11, Math.min(34, (Math.max(width, 280) - labelW - 4) / 24));
+  const W = labelW + cell * 24 + 4, H = headerH + rows.length * cell + 4;
+  const maxV = Math.max(...counts.values());
+  const svg = svgRoot(W, H, "Heatmap of detections by species and hour of day");
+  Object.assign(svg.style, { width: W + "px", maxWidth: "100%" });
+  for (let hr = 0; hr < 24; hr += 3) {
+    s("text", { class: "tick", x: labelW + hr * cell + (cell - 2) / 2, y: 14, "text-anchor": "middle", text: String(hr).padStart(2, "0") }, svg);
+  }
+  rows.forEach((sp, r) => {
+    const top = headerH + r * cell;
+    s("text", { class: "label", x: labelW - 10, y: top + cell / 2 + 4, "text-anchor": "end", text: speciesLabel(sp) }, svg);
+    for (let hr = 0; hr < 24; hr++) {
+      const v = counts.get(`${sp}|${hr}`) || 0;
+      const attrs = { x: labelW + hr * cell, y: top, width: cell - 2, height: cell - 2, rx: 2 };
+      if (!recorded.has(hr)) attrs.class = "cell-none";
+      else if (!v) attrs.class = "cell-zero";
+      else attrs.style = { fill: `var(--h${heatStep(maxV > 1 ? Math.log(v) / Math.log(maxV) : 1)})` };
+      const rect = s("rect", attrs, svg);
+      const hh = String(hr).padStart(2, "0");
+      attachTip(rect, `${speciesLabel(sp)}, ${hh}:00–${hh}:59`, recorded.has(hr)
+        ? [{ value: fmtInt(v), label: "detections" }]
+        : [{ value: "No footage", label: "at this hour" }]);
+    }
+  });
+  const legend = h("div", { class: "legend below" }, [
+    h("span", { class: "legend-item" }, [h("span", { text: "Fewer" }),
+      h("span", { class: "ramp" }, [1, 2, 3, 4, 5, 6, 7].map(i => h("span", { class: "swatch", style: { background: `var(--h${i})` } }))),
+      h("span", { text: "More detections" })]),
+    h("span", { class: "legend-item" }, [h("span", { class: "swatch", style: { background: "var(--zero)" } }), h("span", { text: "None" })]),
+    h("span", { class: "legend-item" }, [h("span", { class: "swatch none" }), h("span", { text: "No footage" })]),
+  ]);
+  return { sub, table, node: h("div", { class: "table-wrap", style: { maxHeight: "none" } }, [svg, legend]) };
+}
+
+function buildZones(sel, width) {
+  const totals = new Map();
+  for (const d of sel.speciesMinutes) {
+    const t = totals.get(d.species) || { left: 0, center: 0, right: 0 };
+    for (const [z] of ZONES) t[z] += d[`zone_${z}`];
+    totals.set(d.species, t);
+  }
+  const rows = SPECIES.filter(sp => totals.has(sp) && ZONES.some(([z]) => totals.get(sp)[z] > 0));
+  const sub = "Share of each species' detections in the left, centre and right third of the watched area.";
+  const table = {
+    columns: [{ label: "Species" }, ...ZONES.map(([, label]) => ({ label, num: true })), { label: "Total", num: true }],
+    rows: rows.map(sp => { const t = totals.get(sp); return [speciesLabel(sp), ...ZONES.map(([z]) => fmtInt(t[z])), fmtInt(t.left + t.center + t.right)]; }),
+  };
+  if (!rows.length) return { sub, table, empty: "No detections in this selection." };
+
+  const rowH = 32, barH = 16, labelW = 124;
+  const W = Math.max(width, 280), H = rows.length * rowH + 4, x0 = labelW, x1 = W - 4;
+  const svg = svgRoot(W, H, "Stacked bars of detections by zone for each species");
+  rows.forEach((sp, i) => {
+    const t = totals.get(sp), total = t.left + t.center + t.right;
+    const top = 2 + i * rowH, cy = top + rowH / 2, yb = cy - barH / 2;
+    s("text", { class: "label", x: x0 - 10, y: cy + 4, "text-anchor": "end", text: speciesLabel(sp) }, svg);
+    const segs = ZONES.filter(([z]) => t[z] > 0);
+    let x = x0;
+    segs.forEach(([z, label, color], k) => {
+      const full = t[z] / total * (x1 - x0), last = k === segs.length - 1;
+      const w = Math.max(1, last ? full : full - 2);
+      const seg = last ? s("path", { d: hbarPath(x, yb, w, barH), style: { fill: color } }, svg)
+        : s("rect", { x, y: yb, width: w, height: barH, style: { fill: color } }, svg);
+      const pct = Math.round(t[z] / total * 100) + "%";
+      if (w >= 40) s("text", { class: "inlabel", x: x + w / 2, y: cy + 4, "text-anchor": "middle", text: pct }, svg);
+      attachTip(seg, `${speciesLabel(sp)}, ${label.toLowerCase()} third`, [
+        { value: pct, label: "of its detections", key: color }, { value: fmtInt(t[z]), label: "detections" }]);
+      x += full;
+    });
+  });
+  const legend = h("div", { class: "legend" }, ZONES.map(([, label, color]) =>
+    h("span", { class: "legend-item" }, [h("span", { class: "swatch", style: { background: color } }), h("span", { text: label })])));
+  const noRight = rows.every(sp => totals.get(sp).right === 0);
+  const note = noRight ? h("p", { class: "note", text: "Nothing was logged in the right third. Runs before the coordinate fix placed boxes without scaling them back from the model's 640px input, so they never reached it." }) : null;
+  return { sub, table, node: h("div", {}, [legend, svg, note]) };
+}
+
+function buildEvents(sel, width) {
+  const items = EVENT_TYPES.map(([key, label]) => ({ key, label, value: sum(sel.events.filter(e => e.event_type === key), e => e.count) }))
+    .filter(d => d.value > 0);
+  const sub = "Scene-level events raised by the live pipeline" + (state.species ? ". These cover all species, so the species filter does not apply." : ".");
+  const table = { columns: [{ label: "Event" }, { label: "Count", num: true }], rows: items.map(d => [d.label, fmtInt(d.value)]) };
+  if (!items.length) return { sub, table, empty: "No events in this selection." };
+  return { sub, table, node: hbars({ items, width, fmt: fmtCompact, tipLabel: "events", label: "Bar chart of scene events by type" }) };
+}
+
+function buildVisits(sel, width) {
+  const bins = VISIT_BINS.map(([lo, hi, short, long]) => ({ short, long, value: sel.visits.filter(v => v.duration_seconds >= lo && v.duration_seconds < hi).length }));
+  const sub = sel.visits.length
+    ? `${fmtInt(sel.visits.length)} visits, median ${fmtDuration(median(sel.visits.map(v => v.duration_seconds)))}. A visit ends once a species is unseen for 10 s.`
+    : "A visit ends once a species is unseen for 10 s.";
+  const table = { columns: [{ label: "Length" }, { label: "Visits", num: true }], rows: bins.map(b => [b.long, fmtInt(b.value)]) };
+  if (!sel.visits.length) return { sub, table, empty: "No visits in this selection." };
+
+  const W = Math.max(width, 280), H = 230, m = { t: 20, r: 8, b: 30, l: 36 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b, band = iw / bins.length, barW = Math.min(24, band * 0.6);
+  const maxV = Math.max(1, ...bins.map(b => b.value));
+  const tStep = Math.max(1, niceStep(maxV, 4)), yMax = Math.ceil(maxV / tStep) * tStep;
+  const y = v => m.t + ih - v / yMax * ih;
+  const svg = svgRoot(W, H, "Column chart of visit lengths");
+  for (let v = 0; v <= yMax; v += tStep) {
+    s("line", { class: v === 0 ? "axis" : "grid", x1: m.l, x2: W - m.r, y1: y(v), y2: y(v) }, svg);
+    s("text", { class: "tick", x: m.l - 8, y: y(v) + 4, "text-anchor": "end", text: fmtTick(v) }, svg);
+  }
+  bins.forEach((b, i) => {
+    const cx = m.l + band * (i + 0.5);
+    const g = s("g", { class: "bar-row", tabindex: 0, role: "img", "aria-label": `${b.long}: ${b.value} visits` }, svg);
+    s("rect", { class: "hit", x: cx - band / 2, y: m.t, width: band, height: ih }, g);
+    if (b.value > 0) {
+      s("path", { class: "bar", d: colPath(cx - barW / 2, y(b.value), barW, y(0)) }, g);
+      s("text", { class: "value", x: cx, y: y(b.value) - 6, "text-anchor": "middle", text: fmtInt(b.value) }, g);
+    }
+    s("text", { class: "tick", x: cx, y: H - 10, "text-anchor": "middle", text: b.short }, svg);
+    attachTip(g, b.long, [{ value: fmtInt(b.value), label: "visits", key: "var(--s1)" }]);
+  });
+  return { sub, table, node: svg };
+}
+
+function buildTogether(sel) {
+  const pairs = new Map();
+  for (const d of sel.cooc) { const k = `${d.species_a}|${d.species_b}`; pairs.set(k, (pairs.get(k) || 0) + d.count); }
+  const rows = [...pairs.entries()].sort((a, b) => b[1] - a[1]);
+  const maxV = rows.length ? rows[0][1] : 1;
+  const sub = "Frames in which both species were detected at the same time.";
+  if (!rows.length) return { sub, empty: "No frames with two species at once in this selection." };
+  return { sub, table: {
+    columns: [{ label: "Pair" }, { label: "Frames", num: true }, { label: "", cls: "bar-cell" }],
+    rows: rows.map(([k, v]) => {
+      const [a, b] = k.split("|");
+      return [`${speciesLabel(a)} + ${speciesLabel(b).toLowerCase()}`, fmtInt(v),
+        h("div", { class: "inline-bar", style: { width: (v / maxV * 100) + "%" }, "aria-hidden": "true" })];
+    }),
+  } };
+}
+
+function buildSessions(sel) {
+  const sub = "Each continuous stretch of recording. A pause longer than two minutes starts a new session.";
+  if (!sel.sessions.length) return { sub, empty: "No sessions in this selection." };
+  return { sub, table: {
+    columns: [{ label: "Day" }, { label: "Time" }, { label: "Length", num: true }, { label: "Frames", num: true }, { label: "Animals in view", num: true }],
+    rows: sel.sessions.map(se => [
+      fmtDay(dayOf(se.start)), `${fmtTime(se.start)}–${fmtTime(se.end)}`,
+      fmtDuration((new Date(se.end) - new Date(se.start)) / 1000), fmtInt(se.frames), fmtPct(se.occupied, se.frames),
+    ]),
+  } };
+}
+
+function makeTable({ columns, rows }) {
+  return h("div", { class: "table-wrap" }, h("table", {}, [
+    h("thead", {}, h("tr", {}, columns.map(c => h("th", { class: [c.num ? "num" : "", c.cls || ""].join(" ").trim() || null, scope: "col", text: c.label })))),
+    h("tbody", {}, rows.map(r => h("tr", {}, r.map((v, i) => h("td", { class: [columns[i].num ? "num" : "", columns[i].cls || ""].join(" ").trim() || null },
+      v instanceof Node ? v : String(v)))))),
+  ]));
+}
+
+const CARDS = [
+  { id: "timeline", title: "Animals in view", wide: true, build: buildTimeline },
+  { id: "species", title: "Detections by species", build: buildSpecies },
+  { id: "zones", title: "Where in the frame", build: buildZones },
+  { id: "hours", title: "Time of day", wide: true, build: buildHours },
+  { id: "events", title: "Scene events", build: buildEvents },
+  { id: "visits", title: "Visit length", build: buildVisits },
+  { id: "together", title: "Seen together", tableOnly: true, build: buildTogether },
+  { id: "sessions", title: "Sessions", tableOnly: true, build: buildSessions },
+];
+
+function buildCards() {
+  const grid = document.getElementById("grid");
+  for (const c of CARDS) {
+    const sub = h("p", { class: "card-sub" });
+    const body = h("div", { class: "card-body" });
+    const btn = c.tableOnly ? null : h("button", {
+      type: "button", class: "view-toggle", id: `toggle-${c.id}`, "aria-pressed": "false", text: "Table",
+      onclick: () => { state.views[c.id] = state.views[c.id] === "table" ? "chart" : "table"; renderCard(c); },
+    });
+    grid.append(h("article", { class: "card" + (c.wide ? " wide" : ""), id: `card-${c.id}` }, [
+      h("header", { class: "card-head" }, [h("div", {}, [h("h3", { text: c.title }), sub]), btn]),
+      body,
+    ]));
+    c.els = { sub, body, btn };
+  }
+}
+
+let currentSel = null;
+function renderCard(c) {
+  const out = c.build(currentSel, c.els.body.clientWidth);
+  const showTable = c.tableOnly || state.views[c.id] === "table";
+  c.els.sub.textContent = out.sub || "";
+  if (c.els.btn) {
+    c.els.btn.textContent = showTable ? "Chart" : "Table";
+    c.els.btn.setAttribute("aria-pressed", String(showTable));
+  }
+  c.els.body.replaceChildren(out.empty ? h("p", { class: "empty", text: out.empty }) : showTable ? makeTable(out.table) : out.node);
+}
+
+function render() {
+  hideTip();
+  currentSel = selection();
+  renderStrip();
+  renderSpeciesFilter(currentSel);
+  renderTiles(currentSel);
+  CARDS.forEach(renderCard);
+}
+
+function renderHeader() {
+  const first = DATA.minutes[0], last = DATA.minutes.at(-1);
+  document.getElementById("eyebrow").textContent = `Wildlife livestream · YOLO detection + ByteTrack · data from ${DATA.source}/`;
+  document.getElementById("lede").textContent = first
+    ? `${fmtInt(DATA.minutes.length)} recorded minutes in ${DATA.sessions.length} sessions between ${fmtDay(dayOf(first.minute))} and ${fmtDay(dayOf(last.minute))} ${last.minute.slice(0, 4)}, logged frame by frame from a camera trained on a savanna scene.`
+    : "No footage has been logged yet. Run main.py, then export again.";
+}
+
+renderHeader();
+buildCards();
+render();
+
+let lastWidth = document.getElementById("grid").clientWidth;
+new ResizeObserver(() => {
+  const w = document.getElementById("grid").clientWidth;
+  if (Math.abs(w - lastWidth) > 4) { lastWidth = w; CARDS.forEach(renderCard); }
+}).observe(document.getElementById("grid"));
+</script>

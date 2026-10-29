@@ -1,0 +1,38 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Dashboard (Streamlit)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "streamlit",
+            "args": ["run", "dashboard.py"],
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
+        },
+        {
+            "name": "Live detection (main.py)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Analyze archived data",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/analyze_data.py",
+            "args": ["--data-dir", "docs"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Detection + Dashboard",
+            "configurations": ["Live detection (main.py)", "Dashboard (Streamlit)"],
+            "stopAll": true
+        }
+    ]
+}

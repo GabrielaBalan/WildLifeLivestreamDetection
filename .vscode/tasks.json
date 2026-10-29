@@ -1,0 +1,20 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Dashboard (Streamlit)",
+            "type": "shell",
+            "command": "/Users/gabrielabalan/PycharmProjects/WildLifeLivestreamDetection/.venv/bin/streamlit run dashboard.py",
+            "options": { "cwd": "${workspaceFolder}" },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Live detection (main.py)",
+            "type": "shell",
+            "command": "/Users/gabrielabalan/PycharmProjects/WildLifeLivestreamDetection/.venv/bin/python main.py",
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        }
+    ]
+}
