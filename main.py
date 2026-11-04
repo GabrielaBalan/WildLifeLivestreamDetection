@@ -11,7 +11,7 @@ from config import (
     LARGE_GROUP_THRESHOLD, VISIT_GAP_SECONDS, EVENT_CONFIRM_FRAMES, EVENT_IMAGE_COOLDOWN_SECONDS,
     SAVE_ANALYTICS_ON_EXIT, SHOW_WINDOW, OUTPUT_DIR,
 )
-from utils.stream_utils import LatestFrameReader, format_timestamp, get_roi, init_folders, save_frame
+from utils.stream_utils import StreamReader, format_timestamp, get_roi, init_folders, save_frame
 from utils.detection_utils import process_box
 from utils.csv_utils import SessionLogs
 from utils.event_utils import EventDetector
@@ -52,7 +52,7 @@ def main():
     stats = SessionStats(start_dt=session_start_dt)
     visit_tracker = VisitTracker(gap_seconds=VISIT_GAP_SECONDS)
     event_detector = EventDetector(EVENT_CONFIRM_FRAMES, LARGE_GROUP_THRESHOLD)
-    reader = LatestFrameReader(YOUTUBE_URL).start()
+    reader = StreamReader(YOUTUBE_URL).start()
 
     frame_id = 0
     last_event_image_time = float("-inf")
@@ -63,8 +63,13 @@ def main():
         while True:
             frame = reader.read()
             if frame is None:
-                print("The stream has ended.")
-                break
+                if reader.finished:
+                    print("The stream has ended.")
+                    break
+                # No frame due yet (the stream pauses between chunks): keep the window responsive
+                if SHOW_WINDOW and cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
+                continue
 
             frame_id += 1
             now_dt = datetime.now()

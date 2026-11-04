@@ -16,9 +16,16 @@ CONF_THRESHOLD = 0.50
 LARGE_GROUP_THRESHOLD = 3
 VISIT_GAP_SECONDS = 10
 
+# Frames analysed per second of stream. YouTube live arrives in ~5 s chunks that decode in a
+# burst; frames are queued and released at this rate so playback and timestamps stay smooth.
+TARGET_FPS = 10
+STREAM_MAX_HEIGHT = 720       # lower resolution = less decoding and memory; ROI/zones are relative
+MAX_QUEUE_SECONDS = 10        # if analysis falls further behind than this, the oldest frames are dropped
+STREAM_TIMEOUT_SECONDS = 15   # give up on a stalled connection and reconnect after this long
+
 # A state change (species appearing/disappearing, large group) must hold for this many
-# consecutive frames before an event fires. Stops single-frame flicker from spamming events.
-EVENT_CONFIRM_FRAMES = 5
+# consecutive frames before an event fires (10 frames = 1 s at TARGET_FPS). Stops flicker spamming events.
+EVENT_CONFIRM_FRAMES = 10
 EVENT_IMAGE_COOLDOWN_SECONDS = 10
 
 SAVE_ANALYTICS_ON_EXIT = True
