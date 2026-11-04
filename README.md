@@ -112,6 +112,20 @@ Both have a day filter, a species filter, and a table view for every chart.
 Set `SHOW_WINDOW = False` in `config.py` to run headless (e.g. on a server or edge device). Use
 `caffeinate -i uv run main.py` to keep a Mac awake during long runs.
 
+### Measuring accuracy
+Three steps tell you how often the detector is right and tune its settings from your answers:
+
+```bash
+uv run collect_eval_frames.py                       # 1. sample 150 frames, one every 15 s (~40 min)
+uv run streamlit run review_app.py --server.port 8502  # 2. confirm or correct each box, count missed animals
+uv run evaluate.py                                  # 3. precision, recall, species accuracy + suggested settings
+```
+
+Collect during daylight with animals around for useful numbers; at night the camera switches to infrared.
+Review saves after every frame, so it can be done in several sittings. The report (`eval/<set>/report.md`)
+suggests a confidence threshold and antelope/ungulate thresholds once enough frames are reviewed. Frames stay
+on your machine (`eval/*/frames/` is not in git); the predictions and your labels are small JSON files you can commit.
+
 ### VS Code
 Select the interpreter in `.venv/` (**Python: Select Interpreter**). Run and Debug has entries for the live
 detection, the dashboard, and both together; **Terminal → Run Task** starts them without the debugger, which is faster

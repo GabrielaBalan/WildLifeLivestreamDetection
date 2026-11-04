@@ -5,7 +5,9 @@
             "label": "Dashboard (Streamlit)",
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/streamlit run dashboard.py",
-            "options": { "cwd": "${workspaceFolder}" },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
             "isBackground": true,
             "problemMatcher": []
         },
@@ -13,7 +15,37 @@
             "label": "Live detection (main.py)",
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python main.py",
-            "options": { "cwd": "${workspaceFolder}" },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Collect evaluation frames",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python collect_eval_frames.py",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Review detections (Streamlit)",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/streamlit run review_app.py --server.port 8502",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Evaluate detector",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python evaluate.py",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
             "problemMatcher": []
         }
     ]

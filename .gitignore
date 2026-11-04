@@ -13,3 +13,6 @@ venv/
 output/
 saved_frames/
 /*.csv
+
+# Evaluation frames are large; the reviewed labels and predictions (JSON) are kept
+eval/*/frames/

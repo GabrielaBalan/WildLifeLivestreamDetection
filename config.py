@@ -54,6 +54,11 @@ EVENTS_CSV = "events.csv"
 VISITS_CSV = "visits.csv"
 ANALYSIS_SUMMARY_TXT = "analysis_summary.txt"
 
+# Accuracy evaluation (collect_eval_frames.py -> review_app.py -> evaluate.py)
+EVAL_DIR = "eval"
+EVAL_MIN_CONF = 0.25          # keep weaker boxes too, so evaluate.py can test other confidence thresholds
+EVAL_SAMPLE_SECONDS = 15      # spacing between sampled frames, so consecutive samples aren't near-copies
+
 CLASS_MAPPING = {
     "elephant": "elephant",
     "zebra": "zebra",

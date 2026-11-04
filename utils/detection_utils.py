@@ -11,7 +11,10 @@ def get_zone(cx: float, x_start: float, x_end: float) -> str:
     return "right"
 
 
-def refine_ungulate_label(x1: int, y1: int, x2: int, y2: int, frame_width: int, frame_height: int) -> str:
+def refine_ungulate_label(
+    x1: int, y1: int, x2: int, y2: int, frame_width: int, frame_height: int,
+    min_aspect_ratio: float = ANTELOPE_MIN_ASPECT_RATIO, min_area: float = LARGE_UNGULATE_MIN_AREA,
+) -> str:
     width = x2 - x1
     height = y2 - y1
     area = width * height
@@ -19,10 +22,10 @@ def refine_ungulate_label(x1: int, y1: int, x2: int, y2: int, frame_width: int, 
     aspect_ratio = height / max(width, 1)
     relative_area = area / max(frame_width * frame_height, 1)
 
-    if aspect_ratio >= ANTELOPE_MIN_ASPECT_RATIO:
+    if aspect_ratio >= min_aspect_ratio:
         return "antelope_like"
 
-    if relative_area >= LARGE_UNGULATE_MIN_AREA:
+    if relative_area >= min_area:
         return "large_ungulate"
 
     return "ungulate"
