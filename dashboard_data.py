@@ -45,7 +45,7 @@ def build_tables(data_dir):
     ).reset_index()
 
     presence = pd.DataFrame(
-        [(minute, species, count) for minute, counts in zip(frames["minute"], frames["counts"])
+        [(minute, species, count) for minute, counts in zip(frames["minute"], frames["counts"], strict=True)
          for species, count in counts.items()],
         columns=["minute", "species", "count"],
     )
@@ -75,7 +75,7 @@ def build_tables(data_dir):
     event_counts = events.groupby(["minute", "event_type"]).size().reset_index(name="count")
 
     pairs = pd.DataFrame(
-        [(minute, a, b) for minute, present in zip(frames["minute"], frames["species_present"])
+        [(minute, a, b) for minute, present in zip(frames["minute"], frames["species_present"], strict=True)
          for a, b in combinations(sorted(present), 2)],
         columns=["minute", "species_a", "species_b"],
     )

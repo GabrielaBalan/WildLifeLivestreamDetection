@@ -34,6 +34,12 @@ def parse_logged_value(value):
         return ast.literal_eval(value)
 
 
+def parse_times(df, *columns):
+    for column in columns:
+        df[column] = pd.to_datetime(df[column], format="mixed", errors="coerce")
+    return df.dropna(subset=list(columns)).reset_index(drop=True)
+
+
 def load_data(data_dir):
     def read(name, required=True):
         path = os.path.join(data_dir, name)
@@ -41,19 +47,25 @@ def load_data(data_dir):
             if required:
                 raise FileNotFoundError(f"{path} not found. Run main.py first or pass --data-dir.")
             return pd.DataFrame()
-        return pd.read_csv(path)
+        df = pd.read_csv(path)
+        # A repeated header row (e.g. from two sessions writing at once) turns every column into text;
+        # re-read without those lines so numbers stay numbers
+        repeated_headers = df[df.columns[0]].astype(str) == df.columns[0]
+        if repeated_headers.any():
+            df = pd.read_csv(path, skiprows=(df.index[repeated_headers] + 1).tolist())
+        return df
 
     detections = read(DETECTIONS_CSV)
     frames = read(FRAME_SUMMARY_CSV)
     events = read(EVENTS_CSV)
     visits = read(VISITS_CSV, required=False)
 
-    for df in (detections, frames, events):
-        df["timestamp"] = pd.to_datetime(df["timestamp"], format="mixed")
-
+    # Rows whose times don't parse (e.g. a row main.py is writing right now) are skipped
+    detections = parse_times(detections, "timestamp")
+    frames = parse_times(frames, "timestamp")
+    events = parse_times(events, "timestamp")
     if not visits.empty:
-        visits["visit_start"] = pd.to_datetime(visits["visit_start"], format="mixed")
-        visits["visit_end"] = pd.to_datetime(visits["visit_end"], format="mixed")
+        visits = parse_times(visits, "visit_start", "visit_end")
 
     frames["species_present"] = frames["species_present"].map(parse_logged_value)
     frames["counts"] = frames["counts"].map(parse_logged_value)

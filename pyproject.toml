@@ -1,3 +1,43 @@
+[project]
+name = "wildlife-livestream-detection"
+version = "0.1.0"
+description = "Detects and tracks animals in a YouTube wildlife livestream and logs structured events."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ultralytics>=8.4",
+    "opencv-python>=4.10",
+    "lap>=0.5.12",
+    "yt-dlp",
+    "pandas>=2.2",
+    "matplotlib>=3.8",
+    "streamlit>=1.46",
+    "plotly>=6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.14",
+]
+# What CI needs to run the tests: no YOLO/PyTorch, headless OpenCV
+test = [
+    "pytest>=8",
+    "opencv-python-headless>=4.10",
+    "pandas>=2.2",
+    "matplotlib>=3.8",
+]
+
+[tool.uv]
+package = false
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# Pinned so a newer ruff with wider defaults doesn't break CI: errors, likely bugs, outdated syntax
+select = ["E4", "E7", "E9", "F", "B", "UP"]

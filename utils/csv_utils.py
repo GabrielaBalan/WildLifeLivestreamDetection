@@ -1,6 +1,7 @@
 import os
 import csv
 import json
+import fcntl
 from config import (
     OUTPUT_DIR,
     DETECTIONS_CSV,
@@ -17,6 +18,8 @@ DETECTION_COLUMNS = [
 ]
 FRAME_SUMMARY_COLUMNS = ["session_id", "frame_id", "timestamp", "total_animals", "species_present", "counts"]
 EVENT_COLUMNS = ["session_id", "frame_id", "timestamp", "event_type", "details", "image_path"]
+LOCK_FILE = ".session.lock"
+
 VISIT_COLUMNS = [
     "session_id", "species", "visit_start", "visit_end", "duration_seconds", "max_count_seen", "individuals_seen"
 ]
@@ -43,6 +46,7 @@ class CsvLog:
         self._writer = csv.writer(self._file)
         if is_new:
             self._writer.writerow(columns)
+            self._file.flush()
 
     def write(self, row):
         self._writer.writerow(row)
@@ -61,6 +65,18 @@ class CsvLog:
 class SessionLogs:
     def __init__(self, session_id, output_dir=OUTPUT_DIR):
         os.makedirs(output_dir, exist_ok=True)
+
+        # Only one session may append to these files at a time: two writers interleave rows and headers.
+        # The OS releases the lock automatically if the process dies.
+        self._lock = open(os.path.join(output_dir, LOCK_FILE), "w")
+        try:
+            fcntl.flock(self._lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            self._lock.close()
+            raise RuntimeError(
+                f"Another session is already logging to {output_dir}/. Stop it before starting a new one."
+            ) from None
+
         self.session_id = session_id
         self.detections = CsvLog(os.path.join(output_dir, DETECTIONS_CSV), DETECTION_COLUMNS)
         self.frames = CsvLog(os.path.join(output_dir, FRAME_SUMMARY_CSV), FRAME_SUMMARY_COLUMNS)
@@ -99,3 +115,4 @@ class SessionLogs:
     def close(self):
         for log in (self.detections, self.frames, self.events, self.visits):
             log.close()
+        self._lock.close()

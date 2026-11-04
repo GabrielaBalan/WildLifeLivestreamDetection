@@ -202,7 +202,7 @@ def zones_figure(species_minutes, order, colors):
     labels = [species_label(s) for s in totals.index]
 
     fig = go.Figure()
-    for zone, color in zip(ZONES, colors["series"]):
+    for zone, color in zip(ZONES, colors["series"], strict=True):
         column = f"zone_{zone}"
         fig.add_trace(go.Bar(
             name=ZONE_LABELS[zone], x=shares[column], y=labels, orientation="h", marker_color=color,

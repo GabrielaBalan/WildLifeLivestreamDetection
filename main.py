@@ -40,15 +40,20 @@ def select_device():
 
 
 def main():
+    session_start_dt = datetime.now()
+    session_id = session_start_dt.strftime("%Y%m%d_%H%M%S")
+
+    try:
+        logs = SessionLogs(session_id)
+    except RuntimeError as e:
+        print(e)
+        return
+
     device = select_device()
     print(f"Loading YOLO model {MODEL_PATH} on {device}...")
     model = YOLO(MODEL_PATH)
     init_folders()
 
-    session_start_dt = datetime.now()
-    session_id = session_start_dt.strftime("%Y%m%d_%H%M%S")
-
-    logs = SessionLogs(session_id)
     stats = SessionStats(start_dt=session_start_dt)
     visit_tracker = VisitTracker(gap_seconds=VISIT_GAP_SECONDS)
     event_detector = EventDetector(EVENT_CONFIRM_FRAMES, LARGE_GROUP_THRESHOLD)

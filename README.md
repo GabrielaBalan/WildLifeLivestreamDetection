@@ -83,21 +83,40 @@ The system can act as an edge AI component. Instead of sending raw video, it out
 - Tracker IDs can change after an occlusion, so individual counts are an upper bound.
 
 ## 10. How to Run
-Requires `yt-dlp` on the PATH (installed with the requirements).
+Setup uses [uv](https://docs.astral.sh/uv/) (`brew install uv`). It installs Python 3.12 and the exact package
+versions from `uv.lock` into `.venv/` inside the project:
 
 ```bash
-pip install -r requirements.txt
-python main.py                          # press 'q' in the window or Ctrl+C to stop
-python analyze_data.py                  # charts from output/
-python analyze_data.py --data-dir docs  # charts from the archived results
-python -m pytest                        # unit tests
+uv sync
 ```
+
+Then:
+
+```bash
+uv run main.py                          # press 'q' in the window or Ctrl+C to stop
+uv run analyze_data.py                  # charts from output/
+uv run analyze_data.py --data-dir docs  # charts from the archived results
+uv run pytest                           # unit tests
+uv run ruff check .                     # lint
+```
+
+Only one `main.py` can log to `output/` at a time; a second one stops with a message instead of mixing up the files.
 
 ### Dashboards
 ```bash
-streamlit run dashboard.py                    # live dashboard; run in a second terminal next to main.py
-python export_dashboard.py --data-dir docs    # writes docs/dashboard.html, a single file you can open or share
+uv run streamlit run dashboard.py               # live dashboard; run in a second terminal next to main.py
+uv run export_dashboard.py --data-dir docs      # writes docs/dashboard.html, a single file you can open or share
 ```
 Both have a day filter, a species filter, and a table view for every chart.
 
-Set `SHOW_WINDOW = False` in `config.py` to run headless (e.g. on a server or edge device).
+Set `SHOW_WINDOW = False` in `config.py` to run headless (e.g. on a server or edge device). Use
+`caffeinate -i uv run main.py` to keep a Mac awake during long runs.
+
+### VS Code
+Select the interpreter in `.venv/` (**Python: Select Interpreter**). Run and Debug has entries for the live
+detection, the dashboard, and both together; **Terminal → Run Task** starts them without the debugger, which is faster
+for long runs.
+
+### Continuous integration
+GitHub Actions (`.github/workflows/ci.yml`) runs `ruff` and the tests on every push and pull request. It installs only
+the light `test` dependency group, so no PyTorch or model download is needed.
