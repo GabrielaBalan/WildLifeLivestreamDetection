@@ -1,14 +1,17 @@
+import logging
 import os
 import threading
 import time
 from collections import deque
 import cv2
 import subprocess
-from datetime import datetime
+from datetime import datetime, UTC
 from config import (
     SAVE_FRAMES, FRAMES_DIR, ROI_BOUNDS, RECONNECT_ATTEMPTS, RECONNECT_DELAY_SECONDS,
     TARGET_FPS, STREAM_MAX_HEIGHT, MAX_QUEUE_SECONDS, STREAM_TIMEOUT_SECONDS,
 )
+
+log = logging.getLogger(__name__)
 
 # If the playback clock falls this far behind (slow inference), restart it instead of racing to catch up
 MAX_LAG_SECONDS = 2.0
@@ -30,8 +33,11 @@ def get_stream_url(youtube_url: str) -> str:
 
 
 def format_timestamp(dt: datetime) -> str:
-    """Millisecond resolution, so frames within the same second stay distinguishable."""
-    return dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    """
+    UTC with millisecond resolution and a trailing Z, e.g. 2026-11-06 12:43:33.066Z. Naive datetimes are taken
+    as the computer's local time. Analysis converts back to camera local time (see analyze_data.to_camera_time).
+    """
+    return dt.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + "Z"
 
 
 def init_folders():
@@ -88,7 +94,15 @@ class StreamReader:
         self._queue = deque(maxlen=max(1, int(target_fps * max_queue_seconds)))
         self._clock = None  # (wall time, stream time) the playback clock is anchored to
         self._stopped = False
+        # Running totals for the health log; written only by the reader thread
+        self.frames_decoded = 0
+        self.frames_dropped = 0
+        self.reconnects = 0
         self._thread = threading.Thread(target=self._run, daemon=True)
+
+    @property
+    def queued(self):
+        return len(self._queue)
 
     @property
     def finished(self):
@@ -101,7 +115,7 @@ class StreamReader:
         return self
 
     def _open(self):
-        print("Fetching direct stream URL...")
+        log.info("Fetching direct stream URL...")
         timeout_ms = STREAM_TIMEOUT_SECONDS * 1000
         cap = cv2.VideoCapture(get_stream_url(self.youtube_url), cv2.CAP_FFMPEG, [
             cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, timeout_ms,
@@ -110,7 +124,7 @@ class StreamReader:
         if not cap.isOpened():
             cap.release()
             raise RuntimeError("Could not open stream.")
-        print("Stream opened.")
+        log.info("Stream opened.")
         return cap
 
     def _run(self):
@@ -127,7 +141,7 @@ class StreamReader:
                     stride = max(1, round(stream_fps / self.target_fps))
                     frame_index = 0
                 except RuntimeError as e:
-                    print(e)
+                    log.warning(e)
 
             ret, frame = cap.read() if cap is not None else (False, None)
             if not ret:
@@ -136,15 +150,17 @@ class StreamReader:
                     cap = None
                 failures += 1
                 if failures > self.max_reconnects:
-                    print("Giving up on the stream after repeated failures.")
+                    log.error("Giving up on the stream after repeated failures.")
                     break
-                print(f"Stream read failed, reconnecting in {self.reconnect_delay}s "
+                self.reconnects += 1
+                log.warning(f"Stream read failed, reconnecting in {self.reconnect_delay}s "
                       f"({failures}/{self.max_reconnects})...")
                 time.sleep(self.reconnect_delay)
                 continue
 
             failures = 0
             frame_index += 1
+            self.frames_decoded += 1
             if frame_index % stride:
                 continue
 
@@ -163,8 +179,10 @@ class StreamReader:
                 # A backlog arrived at once (stream start) or analysis fell behind. Letting the deque drop
                 # its oldest frames would discard exactly the frames about to play, so skip ahead to the
                 # most recent half of the queue and restart the playback clock there instead.
-                for _ in range(len(self._queue) - self._queue.maxlen // 2):
+                skipped = len(self._queue) - self._queue.maxlen // 2
+                for _ in range(skipped):
                     self._queue.popleft()
+                self.frames_dropped += skipped
                 self._clock = None
             self._queue.append((stream_time, frame))
             self._condition.notify_all()

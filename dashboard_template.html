@@ -799,7 +799,7 @@ function render() {
 
 function renderHeader() {
   const first = DATA.minutes[0], last = DATA.minutes.at(-1);
-  document.getElementById("eyebrow").textContent = `Wildlife livestream · YOLO detection + ByteTrack · data from ${DATA.source}/`;
+  document.getElementById("eyebrow").textContent = `Wildlife livestream · YOLO detection + ByteTrack · data from ${DATA.source}/ · camera local time`;
   document.getElementById("lede").textContent = first
     ? `${fmtInt(DATA.minutes.length)} recorded minutes in ${DATA.sessions.length} sessions between ${fmtDay(dayOf(first.minute))} and ${fmtDay(dayOf(last.minute))} ${last.minute.slice(0, 4)}, logged frame by frame from a camera trained on a savanna scene.`
     : "No footage has been logged yet. Run main.py, then export again.";

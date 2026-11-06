@@ -9,6 +9,7 @@ confidence thresholds too. Running it again adds to the same set. Review the fra
 `uv run streamlit run review_app.py`.
 """
 import argparse
+import logging
 import os
 import time
 from datetime import datetime
@@ -20,9 +21,12 @@ from config import EVAL_DIR, EVAL_MIN_CONF, EVAL_SAMPLE_SECONDS, INFERENCE_SIZE,
 from main import select_device
 from utils.detection_utils import process_box
 from utils.eval_utils import read_json, write_json
+from utils.logging_utils import setup_logging
 from utils.stream_utils import StreamReader, format_timestamp, get_roi
 
 BOX_FIELDS = ("raw_class", "species", "x1", "y1", "x2", "y2")
+
+log = logging.getLogger("collect")
 
 
 def main():
@@ -34,25 +38,26 @@ def main():
     args = parser.parse_args()
 
     set_dir = os.path.join(EVAL_DIR, args.set)
+    setup_logging(os.path.join(set_dir, "collect.log"))
     os.makedirs(os.path.join(set_dir, "frames"), exist_ok=True)
     predictions_path = os.path.join(set_dir, "predictions.json")
     predictions = read_json(predictions_path, {"frames": []})
 
     device = select_device()
-    print(f"Loading YOLO model {MODEL_PATH} on {device}...")
+    log.info(f"Loading YOLO model {MODEL_PATH} on {device}...")
     model = YOLO(MODEL_PATH)
     reader = StreamReader(YOUTUBE_URL).start()
 
     collected = 0
     next_sample = 0.0
-    print(f"Collecting {args.count} frames, one every {args.every:g} s. Press Ctrl+C to stop early.")
+    log.info(f"Collecting {args.count} frames, one every {args.every:g} s. Press Ctrl+C to stop early.")
 
     try:
         while collected < args.count:
             frame = reader.read()
             if frame is None:
                 if reader.finished:
-                    print("The stream has ended.")
+                    log.info("The stream has ended.")
                     break
                 continue
 
@@ -81,15 +86,15 @@ def main():
             write_json(predictions_path, predictions)
 
             collected += 1
-            print(f"[{collected}/{args.count}] {format_timestamp(now)}: {len(boxes)} candidate boxes")
+            log.info(f"[{collected}/{args.count}] {format_timestamp(now)}: {len(boxes)} candidate boxes")
 
     except KeyboardInterrupt:
-        print("Interrupted.")
+        log.info("Interrupted.")
 
     finally:
         reader.stop()
 
-    print(f"{len(predictions['frames'])} frames in {set_dir}/. Review them with: uv run streamlit run review_app.py")
+    log.info(f"{len(predictions['frames'])} frames in {set_dir}/. Review them with: uv run streamlit run review_app.py")
 
 
 if __name__ == "__main__":

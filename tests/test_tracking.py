@@ -58,3 +58,24 @@ def test_should_save_event_image():
     assert should_save_event_image(100, float("-inf"), 10)
     assert not should_save_event_image(105, 100, 10)
     assert should_save_event_image(110, 100, 10)
+
+
+def test_track_species_majority_vote_is_confidence_weighted():
+    from tracking import TrackSpecies
+    votes = TrackSpecies(forget_seconds=60)
+
+    for _ in range(5):
+        votes.label(7, "zebra", 0.8, at(0))
+    assert votes.label(7, "ungulate", 0.9, at(1)) == "zebra"     # one stray frame doesn't flip the animal
+    assert votes.label(8, "ungulate", 0.9, at(1)) == "ungulate"  # other tracks vote separately
+
+
+def test_track_species_forgets_stale_tracks():
+    from tracking import TrackSpecies
+    votes = TrackSpecies(forget_seconds=10)
+    votes.label(1, "zebra", 0.9, at(0))
+    votes.label(2, "bird", 0.9, at(8))
+
+    votes.forget_stale(at(15))
+
+    assert list(votes.votes) == [2]

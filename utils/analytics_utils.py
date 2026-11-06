@@ -2,9 +2,11 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import combinations
+from zoneinfo import ZoneInfo
 
 import cv2
 
+from config import CAMERA_TIMEZONE
 from tracking import safe_duration_seconds
 
 
@@ -48,20 +50,25 @@ class SessionStats:
             self.co_occurrence_counter[pair] += 1
 
 
-def save_session_summary(output_path, stats: SessionStats, session_end_dt: datetime):
+def save_session_summary(output_path, stats: SessionStats, session_end_dt: datetime, reader=None):
     duration = safe_duration_seconds(stats.start_dt, session_end_dt)
     occupancy = (stats.frames_with_animals / stats.total_frames * 100) if stats.total_frames > 0 else 0
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("Wildlife Monitoring Session Summary\n")
         f.write("=" * 40 + "\n")
-        f.write(f"Session start: {stats.start_dt.strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write(f"Session end:   {session_end_dt.strftime('%Y-%m-%d %H:%M:%S')}\n")
+        camera_tz = ZoneInfo(CAMERA_TIMEZONE)
+        f.write(f"Session start: {stats.start_dt.astimezone(camera_tz):%Y-%m-%d %H:%M:%S} camera time ({CAMERA_TIMEZONE})\n")
+        f.write(f"Session end:   {session_end_dt.astimezone(camera_tz):%Y-%m-%d %H:%M:%S}\n")
         f.write(f"Duration (s):  {round(duration, 2)}\n")
         f.write(f"Total frames:  {stats.total_frames}\n")
         f.write(f"Frames with animals: {stats.frames_with_animals}\n")
         f.write(f"Occupancy (%): {round(occupancy, 2)}\n")
-        f.write(f"Total events:  {stats.total_events}\n\n")
+        f.write(f"Total events:  {stats.total_events}\n")
+        if reader is not None:
+            f.write(f"Stream: {reader.frames_decoded} frames decoded, {reader.frames_dropped} dropped to catch up, "
+                    f"{reader.reconnects} reconnects\n")
+        f.write("\n")
 
         f.write("Detections by species (box count summed over frames):\n")
         for species, count in stats.detection_counter.most_common():

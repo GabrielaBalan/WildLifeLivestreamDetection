@@ -1,6 +1,11 @@
 import os
 
-YOUTUBE_URL = "https://www.youtube.com/watch?v=DsNtwGJXTTs"
+YOUTUBE_URL = "https://www.youtube.com/watch?v=DsNtwGJXTTs"  # Africam Tau waterhole, Madikwe, South Africa
+
+# Logs record UTC; analysis shows camera local time so "hour of day" means hour at the waterhole.
+CAMERA_TIMEZONE = "Africa/Johannesburg"
+# Logs written before the switch to UTC (e.g. docs/) hold naive times from the recording Mac's clock
+LEGACY_LOG_TIMEZONE = "Europe/Brussels"
 
 # YOLO26 (COCO classes, so CLASS_MAPPING still applies). Downloaded automatically on first run.
 # Measured on this Mac with a 640px ROI: yolo26n ~28 fps (CPU), yolo26s ~36 fps (MPS),
@@ -28,6 +33,11 @@ STREAM_TIMEOUT_SECONDS = 15   # give up on a stalled connection and reconnect af
 EVENT_CONFIRM_FRAMES = 10
 EVENT_IMAGE_COOLDOWN_SECONDS = 10
 
+# Each tracked animal's species is a confidence-weighted vote over its frames; tracks unseen this long are forgotten
+TRACK_MEMORY_SECONDS = 60
+# How often a row of stream/processing health (fps, dropped frames, reconnects) is written to health.csv
+HEALTH_LOG_SECONDS = 60
+
 SAVE_ANALYTICS_ON_EXIT = True
 SHOW_WINDOW = True
 
@@ -52,6 +62,8 @@ DETECTIONS_CSV = "detections.csv"
 FRAME_SUMMARY_CSV = "frame_summary.csv"
 EVENTS_CSV = "events.csv"
 VISITS_CSV = "visits.csv"
+HEALTH_CSV = "health.csv"
+RUN_LOG = "run.log"
 ANALYSIS_SUMMARY_TXT = "analysis_summary.txt"
 
 # Accuracy evaluation (collect_eval_frames.py -> review_app.py -> evaluate.py)

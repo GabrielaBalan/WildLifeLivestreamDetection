@@ -1,3 +1,4 @@
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -57,3 +58,27 @@ class VisitTracker:
         closed = list(self.active_visits.values())
         self.active_visits.clear()
         return closed
+
+
+class TrackSpecies:
+    """
+    Smooths the species label of each tracked animal: a confidence-weighted vote over every frame it was seen in,
+    so a zebra labelled zebra 40 times and horse twice stays a zebra. Tracks unseen for forget_seconds are dropped.
+    """
+
+    def __init__(self, forget_seconds=60):
+        self.forget_seconds = forget_seconds
+        self.votes = {}
+        self.last_seen = {}
+
+    def label(self, track_id, species: str, conf: float, now_dt: datetime) -> str:
+        votes = self.votes.setdefault(track_id, Counter())
+        votes[species] += conf
+        self.last_seen[track_id] = now_dt
+        return votes.most_common(1)[0][0]
+
+    def forget_stale(self, now_dt: datetime):
+        stale = [t for t, seen in self.last_seen.items() if safe_duration_seconds(seen, now_dt) > self.forget_seconds]
+        for track_id in stale:
+            del self.votes[track_id]
+            del self.last_seen[track_id]

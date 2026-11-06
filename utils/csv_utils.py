@@ -8,16 +8,21 @@ from config import (
     FRAME_SUMMARY_CSV,
     EVENTS_CSV,
     VISITS_CSV,
+    HEALTH_CSV,
     CSV_FLUSH_EVERY_ROWS,
 )
 from utils.stream_utils import format_timestamp
 
 DETECTION_COLUMNS = [
-    "session_id", "frame_id", "timestamp", "track_id", "species", "raw_class", "confidence",
+    "session_id", "frame_id", "timestamp", "track_id", "species", "frame_species", "raw_class", "confidence",
     "x1", "y1", "x2", "y2", "cx", "cy", "width", "height", "zone"
 ]
 FRAME_SUMMARY_COLUMNS = ["session_id", "frame_id", "timestamp", "total_animals", "species_present", "counts"]
 EVENT_COLUMNS = ["session_id", "frame_id", "timestamp", "event_type", "details", "image_path"]
+HEALTH_COLUMNS = [
+    "session_id", "timestamp", "frames_analysed", "fps", "inference_ms", "queued_frames",
+    "frames_decoded", "frames_dropped", "reconnects",
+]
 LOCK_FILE = ".session.lock"
 
 VISIT_COLUMNS = [
@@ -82,12 +87,13 @@ class SessionLogs:
         self.frames = CsvLog(os.path.join(output_dir, FRAME_SUMMARY_CSV), FRAME_SUMMARY_COLUMNS)
         self.events = CsvLog(os.path.join(output_dir, EVENTS_CSV), EVENT_COLUMNS, flush_every=1)
         self.visits = CsvLog(os.path.join(output_dir, VISITS_CSV), VISIT_COLUMNS, flush_every=1)
+        self.health = CsvLog(os.path.join(output_dir, HEALTH_CSV), HEALTH_COLUMNS, flush_every=1)
 
     def log_detection(self, frame_id, timestamp, detection):
         x1, y1, x2, y2 = detection["x1"], detection["y1"], detection["x2"], detection["y2"]
         self.detections.write([
             self.session_id, frame_id, timestamp, detection["track_id"], detection["species"],
-            detection["raw_class"], round(detection["conf"], 4),
+            detection.get("frame_species", detection["species"]), detection["raw_class"], round(detection["conf"], 4),
             x1, y1, x2, y2, round((x1 + x2) / 2, 2), round((y1 + y2) / 2, 2), x2 - x1, y2 - y1,
             detection["zone"]
         ])
@@ -112,7 +118,16 @@ class SessionLogs:
             visit.individuals_seen
         ])
 
+    def log_health(self, timestamp, frames_analysed, interval_seconds, inference_seconds, reader):
+        """One row per HEALTH_LOG_SECONDS: how much footage was analysed and how well the stream held up."""
+        self.health.write([
+            self.session_id, timestamp, frames_analysed,
+            round(frames_analysed / interval_seconds, 2) if interval_seconds else 0,
+            round(inference_seconds / frames_analysed * 1000, 1) if frames_analysed else 0,
+            reader.queued, reader.frames_decoded, reader.frames_dropped, reader.reconnects,
+        ])
+
     def close(self):
-        for log in (self.detections, self.frames, self.events, self.visits):
+        for log in (self.detections, self.frames, self.events, self.visits, self.health):
             log.close()
         self._lock.close()

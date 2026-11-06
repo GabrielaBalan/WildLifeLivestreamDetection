@@ -1,6 +1,8 @@
+import logging
 import os
+import time
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, UTC
 
 import cv2
 import torch
@@ -9,14 +11,17 @@ from ultralytics import YOLO
 from config import (
     YOUTUBE_URL, MODEL_PATH, DEVICE, TRACKER_CONFIG, INFERENCE_SIZE, CONF_THRESHOLD,
     LARGE_GROUP_THRESHOLD, VISIT_GAP_SECONDS, EVENT_CONFIRM_FRAMES, EVENT_IMAGE_COOLDOWN_SECONDS,
-    SAVE_ANALYTICS_ON_EXIT, SHOW_WINDOW, OUTPUT_DIR,
+    SAVE_ANALYTICS_ON_EXIT, SHOW_WINDOW, OUTPUT_DIR, TRACK_MEMORY_SECONDS, HEALTH_LOG_SECONDS, RUN_LOG,
 )
 from utils.stream_utils import StreamReader, format_timestamp, get_roi, init_folders, save_frame
 from utils.detection_utils import process_box
 from utils.csv_utils import SessionLogs
 from utils.event_utils import EventDetector
 from utils.analytics_utils import SessionStats, draw_counts, save_session_summary
-from tracking import VisitTracker, should_save_event_image
+from utils.logging_utils import setup_logging
+from tracking import TrackSpecies, VisitTracker, should_save_event_image
+
+log = logging.getLogger("main")
 
 
 def draw_detection(frame, detection):
@@ -40,36 +45,41 @@ def select_device():
 
 
 def main():
-    session_start_dt = datetime.now()
-    session_id = session_start_dt.strftime("%Y%m%d_%H%M%S")
+    setup_logging(os.path.join(OUTPUT_DIR, RUN_LOG))
+    session_start_dt = datetime.now(UTC)
+    session_id = session_start_dt.strftime("%Y%m%d_%H%M%SZ")
 
     try:
         logs = SessionLogs(session_id)
     except RuntimeError as e:
-        print(e)
+        log.error(e)
         return
 
     device = select_device()
-    print(f"Loading YOLO model {MODEL_PATH} on {device}...")
+    log.info(f"Session {session_id}: loading YOLO model {MODEL_PATH} on {device}...")
     model = YOLO(MODEL_PATH)
     init_folders()
 
     stats = SessionStats(start_dt=session_start_dt)
     visit_tracker = VisitTracker(gap_seconds=VISIT_GAP_SECONDS)
     event_detector = EventDetector(EVENT_CONFIRM_FRAMES, LARGE_GROUP_THRESHOLD)
+    track_species = TrackSpecies(forget_seconds=TRACK_MEMORY_SECONDS)
     reader = StreamReader(YOUTUBE_URL).start()
 
     frame_id = 0
     last_event_image_time = float("-inf")
+    health_started = time.monotonic()
+    health_frames = 0
+    health_inference_seconds = 0.0
 
-    print("Running... press 'q' in the video window (or Ctrl+C) to quit.")
+    log.info("Running... press 'q' in the video window (or Ctrl+C) to quit.")
 
     try:
         while True:
             frame = reader.read()
             if frame is None:
                 if reader.finished:
-                    print("The stream has ended.")
+                    log.info("The stream has ended.")
                     break
                 # No frame due yet (the stream pauses between chunks): keep the window responsive
                 if SHOW_WINDOW and cv2.waitKey(1) & 0xFF == ord("q"):
@@ -77,7 +87,7 @@ def main():
                 continue
 
             frame_id += 1
-            now_dt = datetime.now()
+            now_dt = datetime.now(UTC)
             timestamp = format_timestamp(now_dt)
 
             frame_height, frame_width = frame.shape[:2]
@@ -88,9 +98,13 @@ def main():
 
             # YOLO letterboxes the ROI to INFERENCE_SIZE internally (keeping its aspect ratio)
             # and returns boxes in ROI pixel coordinates. ByteTrack assigns persistent IDs.
+            inference_started = time.perf_counter()
             results = model.track(
                 roi, imgsz=INFERENCE_SIZE, persist=True, tracker=TRACKER_CONFIG, device=device, verbose=False
             )[0]
+            health_inference_seconds += time.perf_counter() - inference_started
+            health_frames += 1
+            track_species.forget_stale(now_dt)
 
             counts = Counter()
             track_ids = defaultdict(set)
@@ -102,6 +116,13 @@ def main():
                     )
                     if detection is None:
                         continue
+
+                    # Per-frame guess kept for reference; the tracked animal's majority label is what counts
+                    detection["frame_species"] = detection["species"]
+                    if detection["track_id"] is not None:
+                        detection["species"] = track_species.label(
+                            detection["track_id"], detection["species"], detection["conf"], now_dt
+                        )
 
                     species = detection["species"]
                     counts[species] += 1
@@ -136,13 +157,18 @@ def main():
 
             logs.log_frame_summary(frame_id, timestamp, counts)
 
+            if time.monotonic() - health_started >= HEALTH_LOG_SECONDS:
+                logs.log_health(timestamp, health_frames, time.monotonic() - health_started,
+                                health_inference_seconds, reader)
+                health_started, health_frames, health_inference_seconds = time.monotonic(), 0, 0.0
+
             if SHOW_WINDOW:
                 cv2.imshow("Wildlife Detection", frame)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
 
     except KeyboardInterrupt:
-        print("Interrupted.")
+        log.info("Interrupted.")
 
     finally:
         # Runs on normal exit, Ctrl+C and crashes alike, so no session data is lost
@@ -156,10 +182,10 @@ def main():
 
         if SAVE_ANALYTICS_ON_EXIT:
             summary_path = os.path.join(OUTPUT_DIR, f"session_summary_{session_id}.txt")
-            save_session_summary(summary_path, stats, datetime.now())
-            print(f"Saved {summary_path}")
+            save_session_summary(summary_path, stats, datetime.now(UTC), reader)
+            log.info(f"Saved {summary_path}")
 
-        print("Session finished.")
+        log.info("Session finished.")
 
 
 if __name__ == "__main__":

@@ -9,6 +9,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from config import (
+    CAMERA_TIMEZONE,
+    LEGACY_LOG_TIMEZONE,
     OUTPUT_DIR, CHARTS_DIR, DETECTIONS_CSV, FRAME_SUMMARY_CSV, EVENTS_CSV, VISITS_CSV, ANALYSIS_SUMMARY_TXT,
 )
 
@@ -34,9 +36,30 @@ def parse_logged_value(value):
         return ast.literal_eval(value)
 
 
+def to_camera_time(values):
+    """
+    Parses logged timestamps into naive camera-local times, so hours mean hours at the waterhole. Current logs are
+    UTC ("...Z"); older logs hold naive local times of the recording computer (LEGACY_LOG_TIMEZONE).
+    Values that don't parse become NaT.
+    """
+    text = values.astype(str)
+    has_zone = text.str.contains(r"(?:Z|[+-]\d\d:?\d\d)$")
+    parts = []
+    if has_zone.any():
+        utc = pd.to_datetime(text[has_zone], format="mixed", errors="coerce", utc=True)
+        parts.append(utc.dt.tz_convert(CAMERA_TIMEZONE).dt.tz_localize(None))
+    if (~has_zone).any():
+        local = pd.to_datetime(text[~has_zone], format="mixed", errors="coerce")
+        local = local.dt.tz_localize(LEGACY_LOG_TIMEZONE, ambiguous="NaT", nonexistent="NaT")
+        parts.append(local.dt.tz_convert(CAMERA_TIMEZONE).dt.tz_localize(None))
+    if not parts:
+        return pd.Series(pd.NaT, index=values.index, dtype="datetime64[ns]")
+    return pd.concat(parts).reindex(values.index)
+
+
 def parse_times(df, *columns):
     for column in columns:
-        df[column] = pd.to_datetime(df[column], format="mixed", errors="coerce")
+        df[column] = to_camera_time(df[column])
     return df.dropna(subset=list(columns)).reset_index(drop=True)
 
 
@@ -196,7 +219,7 @@ def plot_co_occurrence(co_occurrence):
 
 def plot_hourly_activity(frames):
     hourly = frames.groupby(frames["timestamp"].dt.hour)["total_animals"].mean()
-    plot_bar(hourly, "Average Animal Activity by Hour", "Hour of Day", "Average Animals per Frame",
+    plot_bar(hourly, "Average Animal Activity by Hour", "Hour of Day (camera time)", "Average Animals per Frame",
              "hourly_activity.png")
 
 

@@ -386,6 +386,6 @@ with st.sidebar:
     st.caption("Leave auto-refresh on while main.py is running to watch new detections arrive.")
 
 st.title("Savanna Cam Log")
-st.caption(f"Wildlife livestream · YOLO detection + ByteTrack · data from `{data_dir}/`")
+st.caption(f"Wildlife livestream · YOLO detection + ByteTrack · data from `{data_dir}/` · times are camera local time (South Africa)")
 
 st.fragment(run_every=refresh_seconds if live else None)(render)(data_dir)
